@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ad Traffic — Traffic Router Health</title>
+<style>
+  :root{
+    --bg:#0f1720; --card:#17212b; --line:#243240; --text:#e8eef4; --muted:#8ca0b3;
+    --green:#2ecc71; --yellow:#f1c40f; --red:#e74c3c; --blue:#4aa3ff;
+    --A:#4aa3ff; --B:#9b7bff; --C:#2ecc71; --D:#f39c12;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.45}
+  .wrap{max-width:960px;margin:0 auto;padding:24px 18px 60px}
+  header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:8px}
+  h1{font-size:20px;margin:0}
+  .sub{color:var(--muted);font-size:13px;margin-top:4px}
+  .btn{background:var(--blue);color:#04121f;border:0;border-radius:8px;padding:8px 14px;
+    font-weight:600;cursor:pointer;font-size:13px}
+  .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  .banner{border-radius:12px;padding:16px 18px;margin:16px 0;display:flex;align-items:center;gap:12px;font-weight:600}
+  .banner .dot{width:14px;height:14px;border-radius:50%}
+  .b-green{background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.4)}
+  .b-yellow{background:rgba(241,196,15,.12);border:1px solid rgba(241,196,15,.4)}
+  .b-red{background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.4)}
+  .demo{background:rgba(241,196,15,.12);border:1px dashed rgba(241,196,15,.5);
+    color:#f6d365;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:14px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .kpi .n{font-size:26px;font-weight:700}
+  .kpi .l{color:var(--muted);font-size:12px;margin-top:2px}
+  h2{font-size:15px;margin:22px 0 10px}
+  .row{margin:14px 0}
+  .row .top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px}
+  .row .name{font-weight:600}
+  .track{position:relative;height:26px;background:#0c141c;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .fill{height:100%;border-radius:5px 0 0 5px;display:flex;align-items:center;padding-left:8px;
+    font-size:12px;font-weight:600;color:#04121f;white-space:nowrap;transition:width .4s}
+  .target{position:absolute;top:-4px;bottom:-4px;width:2px;background:#fff;opacity:.7}
+  .band{position:absolute;top:0;bottom:0;background:rgba(255,255,255,.08);border-left:1px dashed rgba(255,255,255,.25);
+    border-right:1px dashed rgba(255,255,255,.25)}
+  .pill{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:700}
+  .ok{background:rgba(46,204,113,.18);color:var(--green)}
+  .warn{background:rgba(241,196,15,.18);color:var(--yellow)}
+  .bad{background:rgba(231,76,60,.18);color:var(--red)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .checks li{margin:8px 0;display:flex;gap:10px;align-items:flex-start;font-size:13px}
+  .checks .ic{width:18px;flex:0 0 18px;text-align:center}
+  .cfg{margin-top:22px}
+  .cfg input{width:100%;background:#0c141c;border:1px solid var(--line);color:var(--text);
+    border-radius:8px;padding:9px 11px;font-size:13px;margin-top:6px}
+  .foot{color:var(--muted);font-size:12px;margin-top:26px;border-top:1px solid var(--line);padding-top:14px}
+  details summary{cursor:pointer;color:var(--muted);font-size:13px}
+  code{background:#0c141c;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Traffic Router — Health &amp; Split</h1>
+      <div class="sub" id="updated">—</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" onclick="load()">Refresh</button>
+    </div>
+  </header>
+
+  <div class="demo" id="demoBanner" style="display:none">
+    Showing <b>demo data</b> so you can see how this looks. Once the router is live, paste your
+    stats link at the bottom and this fills with real numbers.
+  </div>
+
+  <div class="banner" id="banner">
+    <span class="dot"></span><span id="bannerText">Loading…</span>
+  </div>
+
+  <div class="grid" id="kpis"></div>
+
+  <h2>Traffic split — is each site getting its fair share?</h2>
+  <div class="sub" style="margin-bottom:8px">
+    White line = the target share. Shaded band = the acceptable range (target ±3%).
+    A bar landing inside the band is healthy.
+  </div>
+  <div id="splits"></div>
+
+  <h2>Who's visiting — phone vs. computer</h2>
+  <div class="sub" style="margin-bottom:8px">
+    Most ad traffic is mobile. A site can win overall but lose on phones — always check both.
+  </div>
+  <div class="card" style="padding:6px 4px">
+    <table id="deviceTable"><thead><tr>
+      <th>Site</th><th class="num">Mobile</th><th class="num">Tablet</th>
+      <th class="num">Desktop</th><th class="num">Total</th>
+    </tr></thead><tbody></tbody></table>
+  </div>
+
+  <h2>Health checks</h2>
+  <div class="card"><ul class="checks" id="checks" style="list-style:none;margin:0;padding:0"></ul></div>
+
+  <div class="cfg card">
+    <div style="font-weight:600;font-size:14px">Connect real data</div>
+    <div class="sub">Paste the stats link from your live router (it ends in <code>/stats</code>). Leave blank to keep demo data.</div>
+    <input id="feed" placeholder="https://your-router-address/stats" />
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn" onclick="saveFeed()">Save &amp; load</button>
+      <button class="btn ghost" onclick="clearFeed()">Back to demo</button>
+    </div>
+  </div>
+
+  <div class="foot">
+    <details>
+      <summary>What am I looking at? (plain-English guide)</summary>
+      <p><b>Traffic split:</b> your ads send everyone to the router, which randomly sends each new
+      visitor to one of your sites. This shows whether the split is roughly even. If a bar sits far
+      outside its band, something's off (a site may be down, or misconfigured).</p>
+      <p><b>Health banner:</b> <span style="color:var(--green)">green</span> = all good;
+      <span style="color:var(--yellow)">yellow</span> = worth a look (a site drifting, or low numbers);
+      <span style="color:var(--red)">red</span> = a real problem (no fresh data, or a site getting zero visitors).</p>
+      <p><b>This is a quick daily glance.</b> Your real experiment analysis (which site converts best)
+      lives in GA4 — this dashboard just confirms the plumbing is healthy.</p>
+    </details>
+    <p style="margin-top:14px">Auto-refreshes every 60 seconds when connected to a live feed. Counts exclude bots.</p>
+  </div>
+</div>
+
+<script>
+// ---- Colors per site ----
+const COLORS = {A:'var(--A)',B:'var(--B)',C:'var(--C)',D:'var(--D)'};
+const TOLERANCE = 3; // ±% acceptable band around target
+let timer = null;
+
+// ---- Demo data (used until a real feed URL is saved) ----
+const DEMO = {
+  updated: new Date().toISOString(),
+  windowHours: 24,
+  targets: {A:50, B:50},
+  totals: {visitors:1284, bots_excluded:213},
+  byVariant: {
+    A: {visitors:svd(662), byDevice:{mobile:451,tablet:44,desktop:167}},
+    B: {visitors:svd(622), byDevice:{mobile:429,tablet:39,desktop:154}}
+  }
+};
+function svd(n){return n} // passthrough helper
+
+function getFeed(){ try{return localStorage.getItem('router_feed')||''}catch(e){return ''} }
+function saveFeed(){
+  const v=document.getElementById('feed').value.trim();
+  try{localStorage.setItem('router_feed', v)}catch(e){}
+  load();
+}
+function clearFeed(){
+  try{localStorage.removeItem('router_feed')}catch(e){}
+  document.getElementById('feed').value='';
+  load();
+}
+
+async function load(){
+  const feed = getFeed();
+  document.getElementById('feed').value = feed;
+  let data, isDemo=false;
+  if(feed){
+    try{
+      const r = await fetch(feed, {cache:'no-store'});
+      if(!r.ok) throw new Error('bad response');
+      data = await r.json();
+    }catch(e){
+      data = DEMO; isDemo=true;
+      render(data, true, 'Could not reach the live feed — showing demo data. Check the link.');
+      scheduleRefresh(feed);
+      return;
+    }
+  } else { data = DEMO; isDemo=true; }
+  render(data, isDemo);
+  scheduleRefresh(feed);
+}
+
+function scheduleRefresh(feed){
+  if(timer) clearTimeout(timer);
+  if(feed) timer = setTimeout(load, 60000);
+}
+
+function render(d, isDemo, demoMsg){
+  document.getElementById('demoBanner').style.display = isDemo ? 'block' : 'none';
+  if(isDemo && demoMsg) document.getElementById('demoBanner').innerHTML = demoMsg;
+
+  const ids = Object.keys(d.byVariant);
+  const totalRouted = ids.reduce((s,k)=>s + d.byVariant[k].visitors, 0);
+
+  // ---- Freshness ----
+  const ageMin = (Date.now() - new Date(d.updated).getTime())/60000;
+  document.getElementById('updated').textContent =
+    'Last updated: ' + new Date(d.updated).toLocaleString() +
+    '  •  window: last ' + (d.windowHours||24) + 'h' + (isDemo?'  •  DEMO':'');
+
+  // ---- Health evaluation ----
+  let status='green', reasons=[];
+  const checks=[];
+
+  if(!isDemo && ageMin > 120){ status='red'; reasons.push('No fresh data in over 2 hours'); }
+  else checks.push(['ok','Data is fresh (updated '+Math.max(0,Math.round(ageMin))+' min ago)']);
+
+  ids.forEach(k=>{
+    const share = totalRouted? (d.byVariant[k].visitors/totalRouted*100):0;
+    const target = (d.targets&&d.targets[k])!=null ? d.targets[k] : (100/ids.length);
+    const off = Math.abs(share - target);
+    if(d.byVariant[k].visitors===0 && totalRouted>0){
+      status='red'; reasons.push('Site '+k+' is getting ZERO visitors — it may be down');
+      checks.push(['bad','Site '+k+' received no visitors — check it is live']);
+    } else if(off > TOLERANCE){
+      if(status!=='red') status='yellow';
+      reasons.push('Site '+k+' share is '+share.toFixed(1)+'% (target '+target+'%)');
+      checks.push(['warn','Site '+k+' split is drifting ('+share.toFixed(1)+'% vs '+target+'% target)']);
+    } else {
+      checks.push(['ok','Site '+k+' split looks balanced ('+share.toFixed(1)+'%)']);
+    }
+  });
+
+  if(totalRouted < 100){
+    if(status==='green') status='yellow';
+    reasons.push('Low sample so far ('+totalRouted+' visitors) — early numbers swing a lot');
+    checks.push(['warn','Low sample ('+totalRouted+') — treat early splits loosely']);
+  } else {
+    checks.push(['ok','Healthy sample size ('+totalRouted+' routed visitors)']);
+  }
+
+  // ---- Banner ----
+  const banner=document.getElementById('banner');
+  banner.className='banner ' + (status==='green'?'b-green':status==='yellow'?'b-yellow':'b-red');
+  banner.querySelector('.dot').style.background =
+    status==='green'?'var(--green)':status==='yellow'?'var(--yellow)':'var(--red)';
+  document.getElementById('bannerText').textContent =
+    status==='green' ? 'Healthy — the router is splitting traffic correctly.'
+    : status==='yellow' ? 'Worth a look — ' + reasons[0]
+    : 'Problem — ' + reasons[0];
+
+  // ---- KPIs ----
+  const botPct = d.totals && (d.totals.visitors+d.totals.bots_excluded)>0
+    ? Math.round(d.totals.bots_excluded/(d.totals.visitors+d.totals.bots_excluded)*100) : 0;
+  document.getElementById('kpis').innerHTML = [
+    kpi(totalRouted.toLocaleString(),'Routed visitors'),
+    kpi(ids.length,'Live sites'),
+    kpi((d.totals?d.totals.bots_excluded.toLocaleString():'0'),'Bots excluded ('+botPct+'%)'),
+    kpi((status==='green'?'✓':status==='yellow'?'!':'✕'),'Overall status')
+  ].join('');
+
+  // ---- Split bars ----
+  document.getElementById('splits').innerHTML = ids.map(k=>{
+    const share = totalRouted? (d.byVariant[k].visitors/totalRouted*100):0;
+    const target = (d.targets&&d.targets[k])!=null ? d.targets[k] : (100/ids.length);
+    const off = Math.abs(share-target);
+    const pill = off>TOLERANCE ? (share===0?'bad':'warn') : 'ok';
+    const pillTxt = off>TOLERANCE ? (share===0?'no traffic':'drifting') : 'balanced';
+    const bandL = Math.max(0,target-TOLERANCE), bandW = Math.min(100,target+TOLERANCE)-bandL;
+    return `<div class="row">
+      <div class="top"><span class="name">Site ${k}</span>
+        <span><span class="pill ${pill}">${pillTxt}</span>
+        &nbsp;${share.toFixed(1)}% &nbsp;<span style="color:var(--muted)">(${d.byVariant[k].visitors.toLocaleString()})</span></span></div>
+      <div class="track">
+        <div class="band" style="left:${bandL}%;width:${bandW}%"></div>
+        <div class="fill" style="width:${share}%;background:${COLORS[k]||'var(--blue)'}">${share>=8?share.toFixed(0)+'%':''}</div>
+        <div class="target" style="left:${target}%"></div>
+      </div></div>`;
+  }).join('');
+
+  // ---- Device table ----
+  document.querySelector('#deviceTable tbody').innerHTML = ids.map(k=>{
+    const dv=d.byVariant[k].byDevice||{mobile:0,tablet:0,desktop:0};
+    const tot=(dv.mobile||0)+(dv.tablet||0)+(dv.desktop||0);
+    const pc=n=>tot?Math.round(n/tot*100)+'%':'—';
+    return `<tr><td><b style="color:${COLORS[k]||'var(--blue)'}">Site ${k}</b></td>
+      <td class="num">${(dv.mobile||0).toLocaleString()} <span style="color:var(--muted)">(${pc(dv.mobile||0)})</span></td>
+      <td class="num">${(dv.tablet||0).toLocaleString()} <span style="color:var(--muted)">(${pc(dv.tablet||0)})</span></td>
+      <td class="num">${(dv.desktop||0).toLocaleString()} <span style="color:var(--muted)">(${pc(dv.desktop||0)})</span></td>
+      <td class="num"><b>${tot.toLocaleString()}</b></td></tr>`;
+  }).join('');
+
+  // ---- Checks list ----
+  document.getElementById('checks').innerHTML = checks.map(c=>{
+    const ic = c[0]==='ok'?'<span class="ic" style="color:var(--green)">✓</span>'
+      : c[0]==='warn'?'<span class="ic" style="color:var(--yellow)">!</span>'
+      : '<span class="ic" style="color:var(--red)">✕</span>';
+    return `<li>${ic}<span>${c[1]}</span></li>`;
+  }).join('');
+}
+
+function kpi(n,l){return `<div class="card kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`}
+
+load();
+</script>
+</body>
+</html>
