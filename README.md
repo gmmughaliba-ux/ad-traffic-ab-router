@@ -44,9 +44,8 @@ A single HTML file that reads `/stats` and refreshes every 60 seconds. It shows:
 - Health checks: data freshness, balanced split, sufficient sample size
 - A plain-English guide for non-technical readers
 
-![Dashboard (demo data), top](dashboard-1.png)
-![Dashboard (demo data), health checks](dashboard-2.png)
-
+![Dashboard (demo data), top](dashboard-2.png)
+![Dashboard (demo data), health checks](dashboard-1.png)
 
 ## Design decisions
 
